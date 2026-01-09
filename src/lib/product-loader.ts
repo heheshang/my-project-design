@@ -8,14 +8,14 @@ import { loadDesignSystem, hasDesignSystem } from './design-system-loader'
 import { loadShellInfo, hasShell } from './shell-loader'
 
 // Load markdown files from /product/ directory at build time
-const productFiles = import.meta.glob('/product/*.md', {
+const productFiles = import.meta.glob('../../product/*.md', {
   query: '?raw',
   import: 'default',
   eager: true,
 }) as Record<string, string>
 
 // Load zip files from root directory at build time
-const exportZipFiles = import.meta.glob('/product-plan.zip', {
+const exportZipFiles = import.meta.glob('../../product-plan.zip', {
   query: '?url',
   import: 'default',
   eager: true,
@@ -155,8 +155,16 @@ export function parseProductRoadmap(md: string): ProductRoadmap | null {
  * Load all product data from markdown files and other sources
  */
 export function loadProductData(): ProductData {
-  const overviewContent = productFiles['/product/product-overview.md']
-  const roadmapContent = productFiles['/product/product-roadmap.md']
+  let overviewContent: string | null = null
+  let roadmapContent: string | null = null
+
+  for (const [path, content] of Object.entries(productFiles)) {
+    if (path.includes('product/product-overview.md')) {
+      overviewContent = content
+    } else if (path.includes('product/product-roadmap.md')) {
+      roadmapContent = content
+    }
+  }
 
   return {
     overview: overviewContent ? parseProductOverview(overviewContent) : null,
@@ -171,28 +179,48 @@ export function loadProductData(): ProductData {
  * Check if product overview has been defined
  */
 export function hasProductOverview(): boolean {
-  return '/product/product-overview.md' in productFiles
+  for (const path of Object.keys(productFiles)) {
+    if (path.includes('product/product-overview.md')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Check if product roadmap has been defined
  */
 export function hasProductRoadmap(): boolean {
-  return '/product/product-roadmap.md' in productFiles
+  for (const path of Object.keys(productFiles)) {
+    if (path.includes('product/product-roadmap.md')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Check if export zip file exists
  */
 export function hasExportZip(): boolean {
-  return '/product-plan.zip' in exportZipFiles
+  for (const path of Object.keys(exportZipFiles)) {
+    if (path.includes('product-plan.zip')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Get the URL of the export zip file (if it exists)
  */
 export function getExportZipUrl(): string | null {
-  return exportZipFiles['/product-plan.zip'] || null
+  for (const [path, url] of Object.entries(exportZipFiles)) {
+    if (path.includes('product-plan.zip')) {
+      return url
+    }
+  }
+  return null
 }
 
 // Re-export utility functions for checking individual pieces

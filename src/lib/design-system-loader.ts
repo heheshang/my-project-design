@@ -5,7 +5,7 @@
 import type { DesignSystem, ColorTokens, TypographyTokens } from '@/types/product'
 
 // Load JSON files from product/design-system at build time
-const designSystemFiles = import.meta.glob('/product/design-system/*.json', {
+const designSystemFiles = import.meta.glob('../../product/design-system/*.json', {
   eager: true,
 }) as Record<string, { default: Record<string, string> }>
 
@@ -20,19 +20,20 @@ const designSystemFiles = import.meta.glob('/product/design-system/*.json', {
  * }
  */
 export function loadColorTokens(): ColorTokens | null {
-  const colorsModule = designSystemFiles['/product/design-system/colors.json']
-  if (!colorsModule?.default) return null
-
-  const colors = colorsModule.default
-  if (!colors.primary || !colors.secondary || !colors.neutral) {
-    return null
+  for (const [path, module] of Object.entries(designSystemFiles)) {
+    if (path.includes('product/design-system/colors.json')) {
+      const colors = module.default
+      if (!colors.primary || !colors.secondary || !colors.neutral) {
+        return null
+      }
+      return {
+        primary: colors.primary,
+        secondary: colors.secondary,
+        neutral: colors.neutral,
+      }
+    }
   }
-
-  return {
-    primary: colors.primary,
-    secondary: colors.secondary,
-    neutral: colors.neutral,
-  }
+  return null
 }
 
 /**
@@ -46,19 +47,20 @@ export function loadColorTokens(): ColorTokens | null {
  * }
  */
 export function loadTypographyTokens(): TypographyTokens | null {
-  const typographyModule = designSystemFiles['/product/design-system/typography.json']
-  if (!typographyModule?.default) return null
-
-  const typography = typographyModule.default
-  if (!typography.heading || !typography.body) {
-    return null
+  for (const [path, module] of Object.entries(designSystemFiles)) {
+    if (path.includes('product/design-system/typography.json')) {
+      const typography = module.default
+      if (!typography.heading || !typography.body) {
+        return null
+      }
+      return {
+        heading: typography.heading,
+        body: typography.body,
+        mono: typography.mono || 'IBM Plex Mono',
+      }
+    }
   }
-
-  return {
-    heading: typography.heading,
-    body: typography.body,
-    mono: typography.mono || 'IBM Plex Mono',
-  }
+  return null
 }
 
 /**
@@ -80,22 +82,35 @@ export function loadDesignSystem(): DesignSystem | null {
  * Check if design system has been defined (at least colors or typography)
  */
 export function hasDesignSystem(): boolean {
-  return (
-    '/product/design-system/colors.json' in designSystemFiles ||
-    '/product/design-system/typography.json' in designSystemFiles
-  )
+  for (const path of Object.keys(designSystemFiles)) {
+    if (path.includes('product/design-system/colors.json') ||
+        path.includes('product/design-system/typography.json')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Check if colors have been defined
  */
 export function hasColors(): boolean {
-  return '/product/design-system/colors.json' in designSystemFiles
+  for (const path of Object.keys(designSystemFiles)) {
+    if (path.includes('product/design-system/colors.json')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Check if typography has been defined
  */
 export function hasTypography(): boolean {
-  return '/product/design-system/typography.json' in designSystemFiles
+  for (const path of Object.keys(designSystemFiles)) {
+    if (path.includes('product/design-system/typography.json')) {
+      return true
+    }
+  }
+  return false
 }

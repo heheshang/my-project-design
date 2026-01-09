@@ -6,20 +6,20 @@ import type { ShellSpec, ShellInfo } from '@/types/product'
 import type { ComponentType, ReactNode } from 'react'
 
 // Load shell spec markdown file at build time
-const shellSpecFiles = import.meta.glob('/product/shell/*.md', {
+const shellSpecFiles = import.meta.glob('../../product/shell/*.md', {
   query: '?raw',
   import: 'default',
   eager: true,
 }) as Record<string, string>
 
 // Load shell components lazily
-const shellComponentModules = import.meta.glob('/src/shell/components/*.tsx') as Record<
+const shellComponentModules = import.meta.glob('../shell/components/*.tsx') as Record<
   string,
   () => Promise<{ default: ComponentType }>
 >
 
 // Load shell preview component lazily
-const shellPreviewModules = import.meta.glob('/src/shell/*.tsx') as Record<
+const shellPreviewModules = import.meta.glob('../shell/*.tsx') as Record<
   string,
   () => Promise<{ default: ComponentType }>
 >
@@ -86,15 +86,12 @@ export function parseShellSpec(md: string): ShellSpec | null {
  * Check if shell components exist
  */
 export function hasShellComponents(): boolean {
-  // Check if AppShell.tsx exists
-  const exists = '/src/shell/components/AppShell.tsx' in shellComponentModules
-  // Debug: log available shell components
-  console.log('[Shell] hasShellComponents check:', {
-    exists,
-    availableComponents: Object.keys(shellComponentModules),
-    lookingFor: '/src/shell/components/AppShell.tsx'
-  })
-  return exists
+  for (const path of Object.keys(shellComponentModules)) {
+    if (path.includes('shell/components/AppShell.tsx')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
@@ -103,8 +100,13 @@ export function hasShellComponents(): boolean {
 export function loadShellComponent(
   componentName: string
 ): (() => Promise<{ default: ComponentType }>) | null {
-  const path = `/src/shell/components/${componentName}.tsx`
-  return shellComponentModules[path] || null
+  const targetPath = `shell/components/${componentName}.tsx`
+  for (const [path, module] of Object.entries(shellComponentModules)) {
+    if (path.includes(targetPath)) {
+      return module
+    }
+  }
+  return null
 }
 
 /**
@@ -114,27 +116,43 @@ export function loadShellComponent(
  */
 export function loadAppShell(): (() => Promise<{ default: ComponentType<{ children?: ReactNode }> }>) | null {
   // First try ShellWrapper - a component specifically designed to wrap content
-  const wrapperPath = '/src/shell/components/ShellWrapper.tsx'
-  if (wrapperPath in shellComponentModules) {
-    return shellComponentModules[wrapperPath] as (() => Promise<{ default: ComponentType<{ children?: ReactNode }> }>)
+  for (const [path, module] of Object.entries(shellComponentModules)) {
+    if (path.includes('shell/components/ShellWrapper.tsx')) {
+      return module as (() => Promise<{ default: ComponentType<{ children?: ReactNode }> }>)
+    }
   }
   // Fall back to AppShell
-  const path = '/src/shell/components/AppShell.tsx'
-  return shellComponentModules[path] as (() => Promise<{ default: ComponentType<{ children?: ReactNode }> }>) || null
+  for (const [path, module] of Object.entries(shellComponentModules)) {
+    if (path.includes('shell/components/AppShell.tsx')) {
+      return module as (() => Promise<{ default: ComponentType<{ children?: ReactNode }> }>)
+    }
+  }
+  return null
 }
 
 /**
  * Load shell preview wrapper dynamically
  */
 export function loadShellPreview(): (() => Promise<{ default: ComponentType }>) | null {
-  return shellPreviewModules['/src/shell/ShellPreview.tsx'] || null
+  for (const [path, module] of Object.entries(shellPreviewModules)) {
+    if (path.includes('shell/ShellPreview.tsx')) {
+      return module
+    }
+  }
+  return null
 }
 
 /**
  * Load the complete shell info
  */
 export function loadShellInfo(): ShellInfo | null {
-  const specContent = shellSpecFiles['/product/shell/spec.md']
+  let specContent: string | null = null
+  for (const [path, content] of Object.entries(shellSpecFiles)) {
+    if (path.includes('product/shell/spec.md')) {
+      specContent = content
+      break
+    }
+  }
   const spec = specContent ? parseShellSpec(specContent) : null
   const hasComponents = hasShellComponents()
 
@@ -157,7 +175,12 @@ export function hasShell(): boolean {
  * Check if shell spec has been defined
  */
 export function hasShellSpec(): boolean {
-  return '/product/shell/spec.md' in shellSpecFiles
+  for (const path of Object.keys(shellSpecFiles)) {
+    if (path.includes('product/shell/spec.md')) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
@@ -166,7 +189,7 @@ export function hasShellSpec(): boolean {
 export function getShellComponentNames(): string[] {
   const names: string[] = []
   for (const path of Object.keys(shellComponentModules)) {
-    const match = path.match(/\/src\/shell\/components\/([^/]+)\.tsx$/)
+    const match = path.match(/shell\/components\/([^/]+)\.tsx$/)
     if (match) {
       names.push(match[1])
     }

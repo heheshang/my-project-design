@@ -11,25 +11,25 @@ import type { SectionData, ParsedSpec, ScreenDesignInfo, ScreenshotInfo } from '
 import type { ComponentType } from 'react'
 
 // Load spec.md files from product/sections at build time
-const specFiles = import.meta.glob('/product/sections/*/spec.md', {
+const specFiles = import.meta.glob('../../product/sections/*/spec.md', {
   query: '?raw',
   import: 'default',
   eager: true,
 }) as Record<string, string>
 
 // Load data.json files from product/sections at build time
-const dataFiles = import.meta.glob('/product/sections/*/data.json', {
+const dataFiles = import.meta.glob('../../product/sections/*/data.json', {
   eager: true,
 }) as Record<string, { default: Record<string, unknown> }>
 
 // Load screen design components from src/sections lazily
-const screenDesignModules = import.meta.glob('/src/sections/*/*.tsx') as Record<
+const screenDesignModules = import.meta.glob('../sections/*/*.tsx') as Record<
   string,
   () => Promise<{ default: ComponentType }>
 >
 
 // Load screenshot files from product/sections at build time
-const screenshotFiles = import.meta.glob('/product/sections/*/*.png', {
+const screenshotFiles = import.meta.glob('../../product/sections/*/*.png', {
   query: '?url',
   import: 'default',
   eager: true,
@@ -37,37 +37,37 @@ const screenshotFiles = import.meta.glob('/product/sections/*/*.png', {
 
 /**
  * Extract section ID from a product/sections file path
- * e.g., "/product/sections/invoices/spec.md" -> "invoices"
+ * e.g., "../../product/sections/invoices/spec.md" -> "invoices"
  */
 function extractSectionIdFromProduct(path: string): string | null {
-  const match = path.match(/\/product\/sections\/([^/]+)\//)
+  const match = path.match(/product\/sections\/([^/]+)\//)
   return match?.[1] || null
 }
 
 /**
  * Extract section ID from a src/sections file path
- * e.g., "/src/sections/invoices/InvoiceList.tsx" -> "invoices"
+ * e.g., "../sections/invoices/InvoiceList.tsx" -> "invoices"
  */
 function extractSectionIdFromSrc(path: string): string | null {
-  const match = path.match(/\/src\/sections\/([^/]+)\//)
+  const match = path.match(/sections\/([^/]+)\//)
   return match?.[1] || null
 }
 
 /**
  * Extract screen design name from a file path
- * e.g., "/src/sections/invoices/InvoiceList.tsx" -> "InvoiceList"
+ * e.g., "../sections/invoices/InvoiceList.tsx" -> "InvoiceList"
  */
 function extractScreenDesignName(path: string): string | null {
-  const match = path.match(/\/src\/sections\/[^/]+\/([^/]+)\.tsx$/)
+  const match = path.match(/sections\/[^/]+\/([^/]+)\.tsx$/)
   return match?.[1] || null
 }
 
 /**
  * Extract screenshot name from a file path
- * e.g., "/product/sections/invoices/invoice-list.png" -> "invoice-list"
+ * e.g., "../../product/sections/invoices/invoice-list.png" -> "invoice-list"
  */
 function extractScreenshotName(path: string): string | null {
-  const match = path.match(/\/product\/sections\/[^/]+\/([^/]+)\.png$/)
+  const match = path.match(/product\/sections\/[^/]+\/([^/]+)\.png$/)
   return match?.[1] || null
 }
 
@@ -147,10 +147,10 @@ export function parseSpec(md: string): ParsedSpec | null {
  */
 export function getSectionScreenDesigns(sectionId: string): ScreenDesignInfo[] {
   const screenDesigns: ScreenDesignInfo[] = []
-  const prefix = `/src/sections/${sectionId}/`
+  const prefix = `../sections/${sectionId}/`
 
   for (const path of Object.keys(screenDesignModules)) {
-    if (path.startsWith(prefix)) {
+    if (path.includes(`sections/${sectionId}/`)) {
       const name = extractScreenDesignName(path)
       if (name) {
         screenDesigns.push({
@@ -170,10 +170,9 @@ export function getSectionScreenDesigns(sectionId: string): ScreenDesignInfo[] {
  */
 export function getSectionScreenshots(sectionId: string): ScreenshotInfo[] {
   const screenshots: ScreenshotInfo[] = []
-  const prefix = `/product/sections/${sectionId}/`
 
   for (const [path, url] of Object.entries(screenshotFiles)) {
-    if (path.startsWith(prefix)) {
+    if (path.includes(`product/sections/${sectionId}/`)) {
       const name = extractScreenshotName(path)
       if (name) {
         screenshots.push({
@@ -195,20 +194,37 @@ export function loadScreenDesignComponent(
   sectionId: string,
   screenDesignName: string
 ): (() => Promise<{ default: ComponentType }>) | null {
-  const path = `/src/sections/${sectionId}/${screenDesignName}.tsx`
-  return screenDesignModules[path] || null
+  // Find the matching path in screenDesignModules
+  const targetPath = `sections/${sectionId}/${screenDesignName}.tsx`
+  for (const [path, module] of Object.entries(screenDesignModules)) {
+    if (path.includes(targetPath)) {
+      return module
+    }
+  }
+  return null
 }
 
 /**
  * Load all data for a specific section
  */
 export function loadSectionData(sectionId: string): SectionData {
-  const specPath = `/product/sections/${sectionId}/spec.md`
-  const dataPath = `/product/sections/${sectionId}/data.json`
+  // Find matching paths
+  let specContent: string | null = null
+  let data: Record<string, unknown> | null = null
 
-  const specContent = specFiles[specPath] || null
-  const dataModule = dataFiles[dataPath]
-  const data = dataModule?.default || null
+  for (const [path, content] of Object.entries(specFiles)) {
+    if (path.includes(`product/sections/${sectionId}/spec.md`)) {
+      specContent = content
+      break
+    }
+  }
+
+  for (const [path, module] of Object.entries(dataFiles)) {
+    if (path.includes(`product/sections/${sectionId}/data.json`)) {
+      data = module.default
+      break
+    }
+  }
 
   return {
     sectionId,
@@ -224,7 +240,12 @@ export function loadSectionData(sectionId: string): SectionData {
  * Check if a section has a spec.md file
  */
 export function hasSectionSpec(sectionId: string): boolean {
-  return `/product/sections/${sectionId}/spec.md` in specFiles
+  for (const path of Object.keys(specFiles)) {
+    if (path.includes(`product/sections/${sectionId}/spec.md`)) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
@@ -232,8 +253,13 @@ export function hasSectionSpec(sectionId: string): boolean {
  * Returns true by default, false if spec contains "shell: false"
  */
 export function sectionUsesShell(sectionId: string): boolean {
-  const specPath = `/product/sections/${sectionId}/spec.md`
-  const specContent = specFiles[specPath]
+  let specContent: string | null = null
+  for (const [path, content] of Object.entries(specFiles)) {
+    if (path.includes(`product/sections/${sectionId}/spec.md`)) {
+      specContent = content
+      break
+    }
+  }
   if (!specContent) return true // Default to using shell if no spec
 
   const parsed = parseSpec(specContent)
@@ -244,7 +270,12 @@ export function sectionUsesShell(sectionId: string): boolean {
  * Check if a section has a data.json file
  */
 export function hasSectionData(sectionId: string): boolean {
-  return `/product/sections/${sectionId}/data.json` in dataFiles
+  for (const path of Object.keys(dataFiles)) {
+    if (path.includes(`product/sections/${sectionId}/data.json`)) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
